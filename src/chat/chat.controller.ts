@@ -1,22 +1,49 @@
-import { Controller, Post, Get, Body, Param } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Get,
+  Body,
+  UseGuards,
+  Request,
+  Param,
+  Query,
+  ValidationPipe,
+} from '@nestjs/common';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ChatService } from './chat.service';
+import { SendMessageDtoValidated } from './chat.dto';
+import { User } from 'src/auth/auth.dto';
 
 @Controller('chat')
+@UseGuards(JwtAuthGuard)
 export class ChatController {
-  constructor(private readonly chatService: ChatService) {}
+  constructor(private chatService: ChatService) {}
 
-  @Post('message')
+  @Post('send')
   async sendMessage(
-    @Body() body: { content: string; from: string; to: string },
-  ): Promise<any> {
-    return await this.chatService.sendMessage(body.from, body.to, body.content);
+    @Request() req: User,
+    @Body(ValidationPipe) sendMessageDto: SendMessageDtoValidated,
+  ) {
+    return this.chatService.sendMessage(req.user.id, sendMessageDto);
   }
 
-  @Get('messages/:from/:to')
+  @Get('conversations')
+  async getConversations(@Request() req: User) {
+    return this.chatService.getConversations(req.user.id);
+  }
+
+  @Get('messages/:otherUserId')
   async getMessages(
-    @Param('from') from: string,
-    @Param('to') to: string,
-  ): Promise<any[]> {
-    return await this.chatService.getMessagesBetweenUsers(from, to);
+    @Request() req: User,
+    @Param('otherUserId') otherUserId: string,
+    @Query('limit') limit?: number,
+    @Query('offset') offset?: number,
+  ) {
+    return this.chatService.getMessages(
+      req.user.id,
+      otherUserId,
+      limit || 50,
+      offset || 0,
+    );
   }
 }
