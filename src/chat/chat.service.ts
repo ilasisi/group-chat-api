@@ -150,7 +150,9 @@ export class ChatService {
       }),
     );
 
-    return conversationsWithDetails;
+    return conversationsWithDetails.filter(
+      (conversation) => conversation.last_message !== null,
+    );
   }
 
   async getMessages(
