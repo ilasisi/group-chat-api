@@ -6,6 +6,7 @@ import {
   Message,
   SendMessageDto,
 } from './chat.dto';
+import { pusher } from 'src/config/pusher.config';
 @Injectable()
 export class ChatService {
   async getOrCreateConversation(
@@ -92,6 +93,8 @@ export class ChatService {
     if (error || !data) {
       throw new Error(error?.message || 'Failed to send message');
     }
+
+    await this.sendRealTimeMessage(conversationId, data);
 
     return data;
   }
@@ -183,5 +186,54 @@ export class ChatService {
     }
 
     return data.reverse() as Message[];
+  }
+
+  private async sendRealTimeMessage(conversationId: string, message: any) {
+    try {
+      await pusher.trigger(`user-${conversationId}`, 'new-message', {
+        message,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error('Failed to send real-time message:', error);
+    }
+  }
+
+  async sendTypingIndicator(
+    senderId: string,
+    recipientId: string,
+    isTyping: boolean,
+  ) {
+    try {
+      await pusher.trigger(`private-user-${recipientId}`, 'typing-indicator', {
+        senderId,
+        isTyping,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error('Failed to send typing indicator:', error);
+    }
+  }
+
+  async sendOnlineStatus(userId: string, isOnline: boolean) {
+    try {
+      const conversations = await this.getConversations(userId);
+
+      for (const conversation of conversations) {
+        if (conversation.other_participant) {
+          await pusher.trigger(
+            `private-user-${conversation.other_participant.id}`,
+            'user-status',
+            {
+              userId,
+              isOnline,
+              timestamp: new Date().toISOString(),
+            },
+          );
+        }
+      }
+    } catch (error) {
+      console.error('Failed to send online status:', error);
+    }
   }
 }
